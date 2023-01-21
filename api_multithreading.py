@@ -5,13 +5,13 @@ import time
 import random
 import hashlib
 import base64
-import urllib.request
+#import urllib.request
 import uuid
 import argparse
 
-argParser = argparse.ArgumentParser(description="This is a test")
+argParser = argparse.ArgumentParser(description="API Testing Tool to generate randomized API calls to httpbin server.")
 argParser.add_argument("-c", "--request_count", help="Number of API requests to send", default=1, type=int)
-argParser.add_argument("-d", "--api_url", help="Specify the destination API URL.", default="http://10.10.196.10/")
+argParser.add_argument("-d", "--api_url", help="Specify the URL.", default="http://10.10.196.11/")
 argParser.add_argument("-t", "--thread_count", help="Number of threads to run simultaneously.", default=10, type=int)
 args = argParser.parse_args()
 
@@ -60,10 +60,9 @@ endpoints = [
     'image/png',
     'image/svg',
     'image/webp',
-    'anything'
+    'anything',
+    'echo'
     ]
-
-
 
 class Worker(Thread):
     def __init__(self, tasks):
@@ -86,7 +85,6 @@ class Worker(Thread):
             finally:
                 self.tasks.task_done()
 
-
 class ThreadPool:
     """ Create a pool of threads."""
     def __init__(self, num_threads):
@@ -107,33 +105,33 @@ class ThreadPool:
         """ Wait for completion of all the tasks in the queue """
         self.tasks.join()
 
-
 class APIGenerator():
-    def __init__(self, num_requests, api_url, endpoints, data={}):
+    def __init__(self, num_requests, api_url, endpoints, **data):
         self.num_requests = num_requests
         self.apiURL = api_url
         self.endpoints = endpoints
+        
     
-    def generateEndpointData(self, endpoint_data):
-        new_endpoint = ''
-        #print(endpoint_data)
-        if endpoint_data == 'get': 
-            new_endpoint = 'get?random_num=' + str(random.randint(10000, 99999))
-        elif endpoint_data == 'cache': 
-            new_endpoint = 'cache/' + str(random.randint(0, 1000))
-        elif endpoint_data == 'etag':
-            new_endpoint = 'etag/' + str(uuid.uuid1())
-        elif endpoint_data == 'response-headers':
-            new_endpoint = 'response-headers?random_string=' + words[random.randint(0, len(words)-1)]
-        elif endpoint_data == 'base64':
-            new_endpoint = 'base64/' + base64.b64encode(words[random.randint(0, len(words)-1)].encode('ascii')).decode('ascii')
-        elif endpoint_data == 'range':
-            new_endpoint = 'range/' + str(random.randint(0, 5))
-        elif endpoint_data == 'anything':
-            new_endpoint = 'anything/random_md5/' + hashlib.md5(words[random.randint(0, len(words)-1)].encode()).hexdigest()
+    def generateResources(self, endpoint):
+        if endpoint == 'get':
+            resource = 'get?random_num=' + str(random.randint(10000, 99999))
+        elif endpoint == 'cache': 
+            resource = 'cache/' + str(random.randint(0, 1000))
+        elif endpoint == 'etag':
+            resource = 'etag/' + str(uuid.uuid1())
+        elif endpoint == 'response-headers':
+            resource = 'response-headers?random_string=' + words[random.randint(0, len(words)-1)]
+        elif endpoint == 'base64':
+            resource = 'base64/' + base64.b64encode(words[random.randint(0, len(words)-1)].encode('ascii')).decode('ascii')
+        elif endpoint == 'range':
+            resource = 'range/' + str(random.randint(0, 5))
+        elif endpoint == 'anything':
+            resource = 'anything/random_md5/' + hashlib.md5(words[random.randint(0, len(words)-1)].encode()).hexdigest()
+        elif endpoint == 'anything':
+            resource = 'anything/'
         else:
-            new_endpoint = endpoint_data
-        return new_endpoint
+            resource = endpoint
+        return resource
             
     def rand_endpoint(self):
         return self.endpoints[random.randint(0, len(self.endpoints)-1)]
@@ -142,26 +140,35 @@ class APIGenerator():
         urls = []
         for n in range(self.num_requests):
             endpoint = self.rand_endpoint()
-            endpoint_data = self.generateEndpointData(endpoint)
+            endpoint_data = self.generateResources(endpoint)
             new_endpoint = f"{self.apiURL}{endpoint_data}"
             urls.append(new_endpoint)
         return urls
-
-apiGenerator = APIGenerator(numOfRequests, apiURL, endpoints)
 
 def get(url):
     r = session.get(url)
     print(f"{r} {url}")
 
-urls = apiGenerator.generateURLs()
-pool = ThreadPool(numOfThreads)
-results = {}
-session = requests.session()
+def post(url):
+    r = session.post(url, data={"email": "user@test.com"})
+    print(f"{r} {url}")
+    print(r.text)
 
-now = time.time()
+if __name__ == '__main__':
+    apiGenerator = APIGenerator(numOfRequests, apiURL, endpoints)
+    urls = apiGenerator.generateURLs()
+    #urls = ["http://10.10.196.11/anything?freeform=test"]
 
-pool.map(get, urls)
-pool.wait_completion()
-time_taken = time.time() - now
+    pool = ThreadPool(numOfThreads)
+    results = {}
+    session = requests.session()
 
-print(time_taken)
+    now = time.time()
+
+    pool.map(get, urls)
+
+    #pool.map(post, urls)
+    pool.wait_completion()
+    time_taken = time.time() - now
+
+    print(time_taken)
